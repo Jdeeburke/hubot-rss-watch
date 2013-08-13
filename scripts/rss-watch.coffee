@@ -18,6 +18,9 @@
 #   hubot rss start <id> | all
 #   hubot rss stop <id> | all
 #
+# Notes:
+#   (\[[^\]]*\]) - (.*) (pushed) \d+ commit\(s\) to ([^\s]+) on ([^\s|\n]+)
+#
 # Author:
 #   jdeeburke
 
@@ -166,11 +169,10 @@ module.exports = (robot) ->
   robot.respond /rss start ((\d+)|(all))/i, (msg) ->
     if msg.match[3]
       for feedId of rssWatch.getData().feeds
-        startFeed feedId
-      msg.send "Started all feeds"
+        startFeed feedId, msg
+      msg.send "Starting all feeds..."
     else if feedId = msg.match[2]
-      startFeed feedId
-      msg.send "Started feed #{feedId}"
+      msg.send startFeed feedId, msg
     else
       msg.send "Bad Input."
 
@@ -178,18 +180,34 @@ module.exports = (robot) ->
   robot.respond /rss stop ((\d+)|(all))/i, (msg) ->
     if msg.match[3]
       for feedId of rssWatch.getData().feeds
-        stopFeed feedId
-      msg.send "Stopping all feeds"
+        stopFeed feedId, msg
+      msg.send "Stopping all feeds..."
     else if feedId = msg.match[2]
-      stopFeed feedId
-      msg.send "Stopped feed #{feedId}"
+      msg.send stopFeed feedId, msg
     else
       msg.send "Bad Input."
 
   startFeed = (feedId) ->
-    
+    if feed = rssWatch.getFeed feedId
+      msg.http(feed.url).get() (err, res, body) ->
+        if res.statusCode is not 200
+          msg.send "Problem with feed ##{feedId}"
+        else
+          feed = new NodePie(body)
+          try
+            
+          catch e
+            
+          
+    else
+      return "Invalid Feed ID"
+
 
   stopFeed = (feedId) ->
+    if feed = rssWatch.getFeed feedId
+
+    else
+      return "Invalid Feed ID"
 
 
   infoStringForFeed = (feedId) ->
