@@ -29,7 +29,7 @@ NodePie = require("nodepie")
 
 class Rsswatch
   constructor: (@robot) ->
-    @data = {nextIndex: '1', feeds: {}}
+    @data = {nextFeedIndex: '1', nextAnnouncementsIndex: '1', feeds: {}, announcements: {}}
 
     @robot.brain.on 'loaded', =>
       if @robot.brain.data.rsswatch
@@ -38,9 +38,9 @@ class Rsswatch
     return
 
   addFeed: (feed) ->
-    id = @data.nextIndex
+    id = @data.nextFeedIndex
     @data.feeds[id] = feed
-    @data.nextIndex++
+    @data.nextFeedIndex++
     @saveData()
     return id
 
@@ -55,16 +55,32 @@ class Rsswatch
     return 0
 
   getFeed: (feedId) -> if @data.feeds[feedId] then @data.feeds[feedId] else null
+  
   setFeed: (feedId, feed) -> 
     @data.feeds[feedId] = feed
     @saveData()
 
-  getData: -> @data
+  getFeeds: -> @data.feeds
+  getAnnouncements: -> @data.announcements
+
   saveData: -> @robot.brain.data.rsswatch = @data
+
+  addAnnouncement: (announcement) -> 
+    id = @data.nextAnnouncementIndex
+    @data.announcements[id] = announcement
+    @data.nextFeedIndex++
+    @saveData()
+    return id
+
+  removeAnnouncement: (announceId) ->
+    delete @data.announcements[announceId]
+    @saveData()
 
 
 class Feed
   constructor: (@url, @interval, @announce = false, @announceTemplate = '') ->
+
+  @lastItem = ''
 
   url: -> @url
   interval: -> @interval
@@ -76,7 +92,45 @@ class Feed
   setAnnounce: (announce) -> @announce = announce
   setAnnounceTemplate: (announceTemplate) -> @announceTemplate = announceTemplate
 
-  getObject: -> {url: @url, interval: @interval, announce: @announce, announceTemplate: @announceTemplate}
+  lastItem: -> @lastItem
+
+#
+# @feed is an instantiated Feed object
+#
+# @match is an object with each key referring to an XML tag for a given item, and each value
+#   referring to the regex to use on that data.
+#   
+#   i.e. If you wanted to match ^(\d+) on the <title> tag and (.*)\n? on the <description> tag, 
+#   @match would look like:
+#   
+#   {
+#     title: "^(\d+)",
+#     description: "(.*)\n"
+#   }
+#
+# @template is a string with variables that will be populated by the regex matches.
+#   The variables will refer to the key of the match as well as the regex match ID like so:
+#   @template = "This was post #%%title.1%%" // this will look in the 'title' key for the first regex match
+#   
+#   To match multiple items, you just use their keys and regex match IDs:
+#   @template = "New post on %%pubDate.2%% - %%description.1%%, %%description.2%%"
+# 
+class Announcement
+  constructor: (@name, @match, @template) ->
+
+  name: -> @name
+  match: -> @match
+  template: -> @template
+
+  setName: (name) -> @name = name
+  setMatch: (match) -> @match = match
+  setTemplate: (template) -> @template = template
+
+  announce: (rawData) ->
+
+  getMatches: (rawData) ->
+
+
 
 
 module.exports = (robot) ->
@@ -118,7 +172,7 @@ module.exports = (robot) ->
 
   # rss list
   robot.respond /rss list/i, (msg) ->
-    for feedId of rssWatch.getData().feeds
+    for feedId of rssWatch.getFeeds()
       result = infoStringForFeed feedId
       if result != ""
         msg.send result
@@ -168,7 +222,7 @@ module.exports = (robot) ->
   # rss start <feed id> | <all>
   robot.respond /rss start ((\d+)|(all))/i, (msg) ->
     if msg.match[3]
-      for feedId of rssWatch.getData().feeds
+      for feedId of rssWatch.getFeeds()
         startFeed feedId, msg
       msg.send "Starting all feeds..."
     else if feedId = msg.match[2]
@@ -179,13 +233,24 @@ module.exports = (robot) ->
   # rss stop <feed id> | <all>
   robot.respond /rss stop ((\d+)|(all))/i, (msg) ->
     if msg.match[3]
-      for feedId of rssWatch.getData().feeds
+      for feedId of rssWatch.getFeeds()
         stopFeed feedId, msg
       msg.send "Stopping all feeds..."
     else if feedId = msg.match[2]
       msg.send stopFeed feedId, msg
     else
       msg.send "Bad Input."
+
+  # rss new announcement <name> :: <match> :: <template>
+  robot.respond /rss new announcement (.*)(?! :: )*( :: )(.*)(?! :: )*( :: )(.*)/i, (msg) ->
+    name = msg.match[1]
+    match = msg.match[3]
+    template = msg.match[5]
+
+    announcement = new Announcement name, match, template
+    announceId = rssWatch.addAnnouncement announcement
+    msg.send "Ok, I created your announcement (##{announceId})"
+
 
   startFeed = (feedId) ->
     if feed = rssWatch.getFeed feedId
