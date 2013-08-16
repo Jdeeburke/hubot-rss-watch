@@ -19,7 +19,7 @@
 #   hubot rss stop <id> | all
 #
 # Notes:
-#   (\[[^\]]*\]) - (.*) (pushed) \d+ commit\(s\) to ([^\s]+) on ([^\s|\n]+)
+#   (\[[^\]]*\]) - (.*) (pushed) \d+ commit\(s\) to ([^\s]+) on ([^\s|\n]+)''
 #
 # Author:
 #   jdeeburke
@@ -38,6 +38,7 @@ class Rsswatch
     return
 
   addFeed: (feed) ->
+    # TODO: Add checking for ID or GUID tags. They are required.
     id = @data.nextFeedIndex
     @data.feeds[id] = feed
     @data.nextFeedIndex++
@@ -77,6 +78,7 @@ class Rsswatch
     @saveData()
 
 
+
 class Feed
   constructor: (@url, @interval, @announce = false, @announceTemplate = '') ->
 
@@ -91,6 +93,36 @@ class Feed
   setInterval: (interval) -> @interval = interval
   setAnnounce: (announce) -> @announce = announce
   setAnnounceTemplate: (announceTemplate) -> @announceTemplate = announceTemplate
+
+  refresh: (robot) ->
+    robot.http(@url)
+      .get() (err, res, body) ->
+
+        if err
+          return ''
+
+        if res.statusCode isnt 200
+          return ''
+
+        rateLimitRemaining = parseInt res.getHeader('X-RateLimit-Limit') if res.getHeader('X-RateLimit-Limit')
+        if rateLimitRemaining and rateLImitRemaining < 1
+          return ''
+        
+        newItems = parseNewItems body, @lastItem
+
+
+  parseNewItems: (rawFeed, lastItem) ->
+    feed = new NodePie(rawFeed)
+    try
+      feed.init()
+      items = feed.getItems
+
+      # TODO: Finish the parseNewItems method. Check for new items by guid or id tag
+
+    catch e
+      console.log(e)
+      return null
+    
 
   lastItem: -> @lastItem
 
@@ -127,9 +159,10 @@ class Announcement
   setTemplate: (template) -> @template = template
 
   announce: (rawData) ->
+    # TODO: Write the announce method
 
   getMatches: (rawData) ->
-
+    # TODO: Write the getMatches method
 
 
 
@@ -252,6 +285,7 @@ module.exports = (robot) ->
     msg.send "Ok, I created your announcement (##{announceId})"
 
 
+  # REFACTOR: Rename this method
   startFeed = (feedId) ->
     if feed = rssWatch.getFeed feedId
       msg.http(feed.url).get() (err, res, body) ->
@@ -260,7 +294,7 @@ module.exports = (robot) ->
         else
           feed = new NodePie(body)
           try
-            
+            # TODO: Start feed
           catch e
             
           
@@ -268,9 +302,10 @@ module.exports = (robot) ->
       return "Invalid Feed ID"
 
 
+  # REFACTOR: Rename this method
   stopFeed = (feedId) ->
     if feed = rssWatch.getFeed feedId
-
+      # TODO: Stop Feed
     else
       return "Invalid Feed ID"
 
